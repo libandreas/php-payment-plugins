@@ -1,4 +1,4 @@
-# PHP Payment Plugins
+# PHP Payment Plugins: Πληρωμές Stripe και τιμολόγηση Elorus
 
 ## Επίπεδο διασύνδεσης πληρωμών
 
