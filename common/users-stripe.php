@@ -392,7 +392,7 @@ function send_customer_payment_email($username)
 		return false;
 	}
 
-	// Read email templates from users.json
+	// Read email templates from the global user files
 	$template_title = call_user_data('global', 'info', false, 'template-payment-notification-title');
 	$template_body = call_user_data('global', 'info', false, 'template-payment-notification-body');
 
@@ -639,7 +639,7 @@ function handle_invoice_payment_succeeded($invoice)
 {
 	// Avoid Race Condition with Checkout Session:
 	// If this is the initial subscription creation, let handle_checkout_session_completed handle it.
-	// Otherwise both might try to write to users.json simultaneously, causing data loss.
+	// Keep the event processing serialized when updating subscription fields.
 	if (isset($invoice->billing_reason) && $invoice->billing_reason == 'subscription_create') {
 		return true;
 	}
@@ -710,35 +710,15 @@ function handle_invoice_payment_succeeded($invoice)
 
 function find_username_by_stripe_customer_id($stripe_customer_id)
 {
-	if (empty($stripe_customer_id))
-		return false;
-
-	$db_file = $_SERVER['DOCUMENT_ROOT'] . '/users.json';
-	if (!file_exists($db_file))
-		return false;
-
-	$db = json_decode(file_get_contents($db_file), true);
-	if (!$db || !isset($db['users'])) {
-		trigger_error("Failed to load users.json for customer ID lookup");
+	if (empty($stripe_customer_id)) {
 		return false;
 	}
-
-	foreach ($db['users'] as $username => $data) {
-		// Iterate through billing variants to find the ID
-		if (isset($data['billing'])) {
-
-			foreach ($data['billing'] as $time_key => $variants) {
-				if (is_array($variants)) {
-					foreach ($variants as $key => $value) {
-						if ($key === 'stripe-customer-id' && $value === $stripe_customer_id) {
-							return $username;
-						}
-					}
-				}
-			}
+	$files = glob($_SERVER['DOCUMENT_ROOT'] . '/users/*/billing/*/stripe-customer-id.txt');
+	foreach ($files as $file) {
+		if (file_get_contents($file) === $stripe_customer_id) {
+			return basename(dirname(dirname(dirname($file))));
 		}
 	}
-
 	return false;
 }
 
@@ -839,7 +819,6 @@ if (isset($_POST['manage-billing-stripe'])) {
 // 	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/users-stripe.txt', time());
 //
 // 	// Clean anonymous/invalid users using the loaded JSON DB instead of external username call
-// 	$db = loadJsonDb();
 //
 // 	// If users key missing or not an array, nothing to do
 // 	if (!isset($db['users']) || !is_array($db['users'])) {
@@ -923,7 +902,6 @@ if (isset($_POST['manage-billing-stripe'])) {
 // 		}
 //
 // 		// 4. Save Changes
-// 		saveJsonDb($db);
 // 	}
 // }
 
