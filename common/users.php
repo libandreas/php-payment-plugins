@@ -1,9 +1,23 @@
 <?php
 
+// Invalidate request caches whenever stored user data changes.
+$GLOBALS['user_data_cache_version'] = 0;
+
 ///////////////////////////// CALL USER DATA ////////////////////////////
 
 function call_user_data($username = false, $field = false, $today = false, $variant = false)
 {
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field, $today, $variant]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	if ($username === '' || $username === null) {
 		return '';
 	}
@@ -31,16 +45,28 @@ function call_user_data($username = false, $field = false, $today = false, $vari
 	}
 	$field = mb_strtolower(str_replace(" ", "-", $field));
 	$variant = mb_strtolower(str_replace(" ", "-", $variant));
-	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$variant.{txt,htm}", GLOB_BRACE);
+	$extension = preg_match('/^template-.*-body$/', $variant) ? 'htm' : 'txt';
+	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$variant.$extension");
 	foreach ($files as $file) {
-		return file_get_contents($file);
+		return $cache[$cacheKey] = file_get_contents($file);
 	}
 	$values = call_user_data_in_series($username, $field, $today, $variant);
-	return implode(',', $values);
+	return $cache[$cacheKey] = implode(',', $values);
 }
 
 function call_user_data_in_series($username = false, $field = false, $today = false, $variant = 'category')
 {
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field, $today, $variant]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	if ($username === '' || $username === null) {
 		return array();
 	}
@@ -73,12 +99,13 @@ function call_user_data_in_series($username = false, $field = false, $today = fa
 		}
 	}
 	if (count($values) === 0) {
-		foreach (glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$variant.{txt,htm}", GLOB_BRACE) as $file) {
+		$extension = preg_match('/^template-.*-body$/', $variant) ? 'htm' : 'txt';
+		foreach (glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$variant.$extension") as $file) {
 			$values[] = file_get_contents($file);
 		}
 	}
 	ksort($values, SORT_NUMERIC);
-	return $values;
+	return $cache[$cacheKey] = $values;
 }
 
 function call_user_record($username, $field, $today)
@@ -117,6 +144,17 @@ function call_user_record($username, $field, $today)
 
 function call_custom_variants($username = false, $field = false, $today = false, $exclude_defaults = true)
 {
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field, $today, $exclude_defaults]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	if ($username === '' || $username === null) {
 		return array();
 	}
@@ -145,7 +183,7 @@ function call_custom_variants($username = false, $field = false, $today = false,
 	}
 	$output = array_unique_cross_greek_characters($output);
 	natcasesort($output);
-	return array_values($output);
+	return $cache[$cacheKey] = array_values($output);
 }
 
 function call_user_field_from_today($today)
@@ -246,6 +284,17 @@ function call_user_data_html($username = false, $field = false, $today = false, 
 
 function call_user_file($username = false, $field = false, $today = false, $variant = false)
 {
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field, $today, $variant]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	foreach (array($username, $field, $today, $variant) as $part) {
 		if ($part !== false && $part !== '*' && (preg_match('~[\\\\/\x00*?\[\]{}]~', (string) $part) || $part === '.' || $part === '..')) {
 			trigger_error('Invalid user data path', E_USER_WARNING);
@@ -263,17 +312,28 @@ function call_user_file($username = false, $field = false, $today = false, $vari
 	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$variant.*");
 	foreach ($files as $file) {
 		if (pathinfo($file, PATHINFO_EXTENSION) === 'txt') {
-			return trim(file_get_contents($file));
+			return $cache[$cacheKey] = trim(file_get_contents($file));
 		}
 		if (is_image($file) || is_video($file)) {
-			return path2url($file);
+			return $cache[$cacheKey] = path2url($file);
 		}
 	}
-	return false;
+	return $cache[$cacheKey] = false;
 }
 
 function call_user_file_in_series($username = false, $field = false, $today = false, $variant = false)
 {
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field, $today, $variant]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	foreach (array($username, $field, $today, $variant) as $part) {
 		if ($part !== false && $part !== '*' && (preg_match('~[\\\\/\x00*?\[\]{}]~', (string) $part) || $part === '.' || $part === '..')) {
 			trigger_error('Invalid user data path', E_USER_WARNING);
@@ -302,7 +362,7 @@ function call_user_file_in_series($username = false, $field = false, $today = fa
 		}
 	}
 	ksort($urls, SORT_NUMERIC);
-	return $urls;
+	return $cache[$cacheKey] = $urls;
 }
 
 function call_user_file_nested_x($username = false, $field = false, $today = false, $variant = false, $x = false)
@@ -450,19 +510,34 @@ function call_user_rank($username)
 
 function call_username_by_today($today, $field = 'listings')
 {
-	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/*/$field/$today/title.txt");
-	foreach ($files as $file) {
-		return basename(dirname($file, 3));
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
 	}
-	return null;
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $today, $field]);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
+	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/*/$field/$today/*.*");
+	foreach ($files as $file) {
+		if (is_file($file)) {
+			return $cache[$cacheKey] = basename(dirname($file, 3));
+		}
+	}
+	return $cache[$cacheKey] = null;
 }
 
 function call_username_by_today_this_user($today)
 {
 	$username = USERNAME;
-	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/listings/$today/title.txt");
+	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/listings/$today/*.*");
 	foreach ($files as $file) {
-		return $username;
+		if (is_file($file)) {
+			return $username;
+		}
 	}
 	return null;
 }
@@ -506,17 +581,28 @@ function call_user_todays($username = false, $field = false, $reverse = true)
 	if ($field === false) {
 		$field = '*';
 	}
-	$variant = ($field === 'listings' || $field === 'portfolio') ? 'title' : '*';
-	$todays = array();
-	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/*/$variant.{txt,htm}", GLOB_BRACE);
-	foreach ($files as $file) {
-		$todays[] = basename(dirname($file));
+	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
 	}
-	$todays = array_values(array_unique($todays));
-	if ($reverse) {
-		rsort($todays);
-	} else {
+	$cacheKey = serialize([$_SERVER['DOCUMENT_ROOT'], $username, $field]);
+	if (!array_key_exists($cacheKey, $cache)) {
+		$todays = array();
+		$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/*/*.*");
+		foreach ($files as $file) {
+			if (is_file($file)) {
+				$todays[] = basename(dirname($file));
+			}
+		}
+		$todays = array_values(array_unique($todays));
 		sort($todays);
+		$cache[$cacheKey] = $todays;
+	}
+	$todays = $cache[$cacheKey];
+	if ($reverse) {
+		$todays = array_reverse($todays);
 	}
 	return $todays;
 }
@@ -525,6 +611,11 @@ function call_user_todays_with_pagination_and_filters($username = false, $field 
 {
 	// Static cache array
 	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
 
 	// Generate a unique cache key based on function arguments and relevant GET parameters
 	$cacheKey = md5(serialize(func_get_args()) . serialize($_GET));
@@ -562,7 +653,7 @@ function call_user_todays_with_pagination_and_filters($username = false, $field 
 	// Assume $files is an array of today's directories
 	$filteredFiles = [];
 
-	// et the internal character encoding
+	// Set the internal character encoding
 	mb_internal_encoding('UTF-8');
 
 	// Create an array of GET parameters for comparison
@@ -765,22 +856,30 @@ function write_user_data($username = 'global', $field = 'info', $today = '1', $v
 		foreach (glob($directory . "/$variant-*.txt") as $file) {
 			$key = substr(pathinfo($file, PATHINFO_FILENAME), strlen($variant) + 1);
 			if (ctype_digit($key) && !array_key_exists($key, $data_to_push)) {
+				$GLOBALS['user_data_cache_version']++;
+				clearstatcache();
 				unlink($file);
 			}
 		}
 		foreach (glob($directory . "/$variant.{txt,htm}", GLOB_BRACE) as $file) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($file);
 		}
 		return true;
 	}
 	$extension = preg_match('/^template-.*-body$/', $variant) ? 'htm' : 'txt';
 	$file = $directory . "/$variant.$extension";
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (file_put_contents($file, (string) $data_to_push, LOCK_EX) === false) {
 		return false;
 	}
 	if (preg_match('/^(image|video)-[0-9]+$/D', $variant)) {
 		foreach (glob($directory . "/$variant.*") as $old_file) {
 			if ($old_file !== $file && (is_image($old_file) || is_video($old_file))) {
+				$GLOBALS['user_data_cache_version']++;
+				clearstatcache();
 				unlink($old_file);
 			}
 		}
@@ -788,12 +887,16 @@ function write_user_data($username = 'global', $field = 'info', $today = '1', $v
 	$files = glob($directory . "/$variant.{txt,htm}", GLOB_BRACE);
 	foreach ($files as $old_file) {
 		if ($old_file != $file) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($old_file);
 		}
 	}
 	foreach (glob($directory . "/$variant-*.txt") as $old_file) {
 		$key = substr(pathinfo($old_file, PATHINFO_FILENAME), strlen($variant) + 1);
 		if (ctype_digit($key)) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($old_file);
 		}
 	}
@@ -844,6 +947,8 @@ function write_user_file($username, $field, $today, $variant, $tmp_location = fa
 	$existing_files = glob($dest_dir . "$variant.*");
 	if (!empty($existing_files)) {
 		foreach ($existing_files as $existing_file) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($existing_file);
 		}
 	}
@@ -851,6 +956,8 @@ function write_user_file($username, $field, $today, $variant, $tmp_location = fa
 	$dest_file = $dest_dir . "$variant.$ext";
 
 	// Start writing the file
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (move_uploaded_file($tmp_location, $dest_file) || copy($tmp_location, $dest_file) || copy_from_url($tmp_location, $dest_file)) {
 		chmod($dest_file, 0777);
 
@@ -916,6 +1023,8 @@ function write_user_file_append($username, $field, $today, $variant, $tmp_locati
 
 	create_path(dirname($new_path));
 
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (move_uploaded_file($tmp_location, $new_path) || copy($tmp_location, $new_path) || copy_from_url($tmp_location, $new_path)) {
 		chmod($new_path, 0777);
 
@@ -949,6 +1058,8 @@ function move_user_data_up($username, $field, $today)
 	if ($next_today == null || count($candidates) == 0 || file_exists($directory . "/$next_today")) {
 		return false;
 	}
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (rename($directory . "/$today", $directory . "/$next_today")) {
 		return $next_today;
 	}
@@ -964,6 +1075,8 @@ function move_user_data_down($username, $field, $today)
 	if ($next_today == null || count($candidates) == 0 || file_exists($directory . "/$next_today")) {
 		return false;
 	}
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (rename($directory . "/$today", $directory . "/$next_today")) {
 		return $next_today;
 	}
@@ -1034,6 +1147,8 @@ function delete_user_data($username = false, $field = false, $today = false, $va
 		}
 	}
 	foreach ($files as $file) {
+		$GLOBALS['user_data_cache_version']++;
+		clearstatcache();
 		unlink($file);
 	}
 	return true;
@@ -1067,6 +1182,8 @@ function delete_user_data_all($username = false, $field = false, $today = false,
 	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$pattern");
 	foreach ($files as $file) {
 		if ($data_to_pull === false || trim(file_get_contents($file)) == trim($data_to_pull)) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($file);
 			$found = true;
 		}
@@ -1100,6 +1217,8 @@ function delete_user_data_nested_x($username = false, $field = false, $today = f
 	$pattern = "$variant-$key.txt";
 	$files = glob($_SERVER['DOCUMENT_ROOT'] . "/users/$username/$field/$today/$pattern");
 	foreach ($files as $file) {
+		$GLOBALS['user_data_cache_version']++;
+		clearstatcache();
 		unlink($file);
 		$found = true;
 	}
@@ -1132,6 +1251,8 @@ function delete_user_file($username = false, $field = false, $today = false, $va
 	foreach ($files as $file) {
 		//delete
 		if (file_exists($file)) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($file);
 			$data_found = true;
 		}
@@ -1166,6 +1287,8 @@ function delete_user_file_all($username = false, $field = false, $today = false,
 		}
 		$value = pathinfo($file, PATHINFO_EXTENSION) === 'txt' ? trim(file_get_contents($file)) : path2url($file);
 		if ($data_to_pull === false || $value === $data_to_pull) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			unlink($file);
 			$found = true;
 		}
@@ -1193,7 +1316,7 @@ function add_to_favorites($user_to_favorite, $current_user)
 
 //////////////////////////////// STATUS FUNCTIONS /////////////////////
 
-function check_rate_limit(callable $verify)
+function check_rate_limit(callable $verify, $show_errors = true, $count_failure = true)
 {
 	$ip = $_SERVER['REMOTE_ADDR'];
 	$file = fopen($_SERVER['DOCUMENT_ROOT'] . '/login-attempts.txt', 'c+');
@@ -1233,8 +1356,9 @@ function check_rate_limit(callable $verify)
 		$valid = false;
 		if ($retry_after === 0) {
 			$valid = $verify();
-			if (!$valid) {
+			if (!$valid && $count_failure && empty($GLOBALS['login_failure_recorded'])) {
 				$data[$ip][] = time();
+				$GLOBALS['login_failure_recorded'] = true;
 			}
 		}
 
@@ -1254,19 +1378,62 @@ function check_rate_limit(callable $verify)
 	}
 
 	if ($retry_after > 0) {
+		if (!$show_errors) {
+			return false;
+		}
 		http_response_code(429);
 		header('Retry-After: ' . $retry_after);
-		trigger_error('Πολλά αιτήματα. Προσπαθήστε ξανά σε ' . $retry_after . ' δευτερόλεπτα.', E_USER_WARNING);
+		trigger_error('Too many requests. Please try again in ' . $retry_after . ' seconds.', E_USER_WARNING);
 		exit;
 	}
 	return $valid;
 }
 
+function confirm_guardian_email($confirming_email, $code, $show_errors = false)
+{
+	$username = null;
+	$guardian_email = null;
+	$valid = check_rate_limit(function () use ($code, $confirming_email, &$username, &$guardian_email) {
+		if (!is_string($code) || trim($code) === '' || !is_string($confirming_email) || trim($confirming_email) === '') {
+			return false;
+		}
+		foreach (call_usernames_all(true) as $user) {
+			$user_code = call_user_data($user, 'info', false, 'code-guardian');
+			if ($user_code != null && $user_code == $code) {
+				$username = $user;
+				$guardian_email = call_user_data($user, 'info', false, 'guardian-email-for-review');
+				if ($guardian_email != null && $confirming_email == $guardian_email) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}, $show_errors);
+
+	if (!$valid) {
+		if ($show_errors) {
+			trigger_error($username
+				? 'Το email που εισάγατε δεν ταιριάζει με το email του κηδεμόνα.'
+				: 'Ο κωδικός επιβεβαίωσης δεν βρέθηκε.');
+		}
+		return false;
+	}
+	write_user_data($username, 'info', false, 'guardian-email', $guardian_email);
+	delete_user_data($username, 'info', false, 'guardian-email-for-review');
+	delete_user_data($username, 'info', false, 'code-guardian');
+	return true;
+}
+
 function is_user_login($username, $passwd, $show_errors = false)
 {
 	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
 
-	$cacheKey = $username . '|' . $passwd;
+	$cacheKey = $username . '|' . $passwd . '|' . ($show_errors ? '1' : '0');
 
 	if (isset($cache[$cacheKey])) {
 		if (!$cache[$cacheKey] && $show_errors) {
@@ -1300,7 +1467,7 @@ function is_user_login($username, $passwd, $show_errors = false)
 			}
 		}
 		return false;
-	});
+	}, $show_errors, isset($_POST['passwd']) || isset($_GET['passwd']));
 
 	$cache[$cacheKey] = $match;
 	if (!$match && $show_errors) {
@@ -1312,6 +1479,11 @@ function is_user_login($username, $passwd, $show_errors = false)
 function is_user_super_power($username, $passwd, $show_errors = false)
 {
 	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
 
 	$cacheKey = $username . '|' . $passwd . '|' . ($show_errors ? '1' : '0');
 
@@ -1349,6 +1521,11 @@ function can_profile_write($username, $passwd, $profile_username, $show_errors =
 	}
 
 	static $cache = [];
+	static $cacheVersion = -1;
+	if ($cacheVersion !== $GLOBALS['user_data_cache_version']) {
+		$cache = [];
+		$cacheVersion = $GLOBALS['user_data_cache_version'];
+	}
 
 	$cacheKey = $username . '|' . $passwd . '|' . $profile_username . '|' . ($show_errors ? '1' : '0');
 	if (isset($cache[$cacheKey])) {
@@ -1561,6 +1738,8 @@ function change_user_email($username, $email)
 		trigger_error('This email already has an account', E_USER_WARNING);
 		return false;
 	}
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	if (!rename($directory . "/$username", $directory . "/$email")) {
 		return false;
 	}
@@ -1579,12 +1758,16 @@ function change_user_email($username, $email)
 		}
 		unset($entry);
 		if ($changed) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			file_put_contents($file, implode(',', $entries), LOCK_EX);
 		}
 	}
 	$files = glob($directory . '/*/info/1/favorites-*.txt');
 	foreach ($files as $file) {
 		if (file_get_contents($file) === $username) {
+			$GLOBALS['user_data_cache_version']++;
+			clearstatcache();
 			file_put_contents($file, $email, LOCK_EX);
 		}
 	}
@@ -1604,6 +1787,8 @@ function change_user_email($username, $email)
 			unset($entry);
 		}
 		unset($entries);
+		$GLOBALS['user_data_cache_version']++;
+		clearstatcache();
 		file_put_contents($visits_file, json_encode($visits, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
 	}
 	delete_user_data($email, 'info', '1', 'email');
@@ -2439,6 +2624,8 @@ if (!defined('LOCATION') && function_exists('call_current_location')) {
 if (isset($_GET['delete-account']) && is_user_super_power(USERNAME, PASSWD)) {
 
 	//todo: backup??? or not
+	$GLOBALS['user_data_cache_version']++;
+	clearstatcache();
 	delete_directory($_SERVER['DOCUMENT_ROOT'] . '/users/' . THIS_USERNAME); //only for admin
 	trigger_error("User " . THIS_USERNAME . " deleted");
 }
